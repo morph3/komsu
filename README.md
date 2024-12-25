@@ -13,8 +13,7 @@ Levels:
 
 Komsu at the end generates bunch of trees and visualizes them in an HTML file. You can easily eliminate a family of URLs shortening the analysis process.
 
-![1.png](https://github.com/morph3/komsu/blob/main/1.png)
-
+![1.png](https://github.com/morph3/komsu/blob/main/images/1.png)
 Demo,
 
 https://morph3.blog/komsu/komsu.html
