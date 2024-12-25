@@ -11,7 +11,7 @@ Levels:
     3: body + headers + status_code + reason
 ```
 
-Komsu at the end generates a bunch of trees and visualizes them in an HTML file. You can easily eliminate a family of URLs and shorten the analysis process.
+Komsu at the end generates a bunch of trees and visualizes them in an HTML file. You can easily eliminate a family of URLs and fasten the analysis process.
 
 ![1.png](https://github.com/morph3/komsu/blob/main/images/1.png)
 Demo,
