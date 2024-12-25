@@ -1,5 +1,7 @@
 # Komsu
 
+`Komşu`, `neighbour` visualizes potentially neighbour URLs. 
+
 You are a security researcher or a bug bounty hunter and you have a bunch of URLs but you don't know where to start ? Komsu can help you.
 
 Give your URLs to Komsu and it will generate a bunch of 3-level trees based on the responses. Each level is calculated as follows,
