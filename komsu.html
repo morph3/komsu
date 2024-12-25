@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Response Hash Visualization</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <link href="https://unpkg.com/vis-network/standalone/umd/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #network {
+            width: 100%;
+            height: 700px;
+            border: 1px solid #e0e0e0;
+            background-color: #ffffff;
+            border-radius: 8px;
+        }
+        #urlList {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background-color: #fafafa;
+        }
+        .url-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .stats {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0,0,0,0.7);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        .zoom-controls {
+            position: absolute;
+            right: 30px;
+            top: 100px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .search-container {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+        }
+        #searchInput {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex-grow: 1;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>URL Response Hash Visualization</h1>
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Search by hash or URL...">
+            <button onclick="searchNodes()">Search</button>
+        </div>
+        <div class="controls">
+            <button onclick="togglePhysics()">Toggle Physics</button>
+            <button onclick="fitNetwork()">Fit View</button>
+        </div>
+        <div style="position: relative;">
+            <div id="network"></div>
+            <div class="zoom-controls">
+                <button onclick="network.zoomIn()">+</button>
+                <button onclick="network.zoomOut()">-</button>
+            </div>
+        </div>
+        <div class="stats">
+            <span id="nodeCount">Nodes: 0</span> | 
+            <span id="edgeCount">Edges: 0</span> |
+            <span id="selectedNode">Selected: None</span>
+        </div>
+        <h2>URLs in Selected Node</h2>
+        <div id="urlList"></div>
+    </div>
+    <div class="loading" id="loadingIndicator">Loading...</div>
+
+    <script>
+        let network;
+        let treeData;
+        let nodesDataset;
+        let edgesDataset;
+        let isHierarchicalLayout = true;
+        const colorCache = {};
+
+        async function loadData() {
+            try {
+                document.getElementById('loadingIndicator').style.display = 'block';
+                const response = await fetch('tree.json');
+                treeData = await response.json();
+                
+                // Pre-calculate nodes and edges
+                const { nodes, edges } = processAllNodes(treeData);
+                
+                // Create datasets only once
+                nodesDataset = new vis.DataSet(nodes);
+                edgesDataset = new vis.DataSet(edges);
+                
+                createNetwork();
+                updateStats();
+                network.stabilize(100);
+            } catch (error) {
+                console.error('Error loading data:', error);
+            } finally {
+                document.getElementById('loadingIndicator').style.display = 'none';
+            }
+        }
+
+        function processAllNodes(data) {
+            const nodes = [];
+            const edges = [];
+            Object.entries(data).forEach(([hash, nodeData]) => {
+                processNode(hash, nodeData, nodes, edges);
+            });
+            return { nodes, edges };
+        }
+
+        function processNode(hash, data, nodes, edges, parent = null, level = 0) {
+            const shortHash = hash.substring(0, 6);
+            const urlCount = data.urls.length;
+            
+            nodes.push({
+                id: hash,
+                label: `${shortHash}\n(${urlCount})`,
+                title: `Hash: ${hash}\nURLs: ${urlCount}`,
+                level: level,
+                urls: data.urls,
+                value: Math.max(10, Math.min(30, urlCount * 2)),
+                color: getColorForLevel(level),
+                font: { 
+                    color: '#000000',
+                    size: 12,
+                    face: 'Arial'
+                }
+            });
+
+            if (parent) {
+                edges.push({
+                    from: parent,
+                    to: hash,
+                    arrows: 'to',
+                    color: { color: '#848484', opacity: 0.5 }
+                });
+            }
+
+            if (data.children) {
+                Object.entries(data.children).forEach(([childHash, childData]) => {
+                    processNode(childHash, childData, nodes, edges, hash, level + 1);
+                });
+            }
+        }
+
+        function getColorForLevel(level) {
+            if (colorCache[level]) {
+                return colorCache[level];
+            }
+            
+            const colors = [
+                { background: '#E3F2FD', border: '#2B7CE9' },
+                { background: '#F3E5F5', border: '#2B7CE9' },
+                { background: '#E8F5E9', border: '#2B7CE9' },
+                { background: '#FFF3E0', border: '#2B7CE9' },
+                { background: '#FFEBEE', border: '#2B7CE9' },
+                { background: '#F5F5F5', border: '#2B7CE9' }
+            ];
+            
+            const color = colors[Math.min(level, colors.length - 1)];
+            colorCache[level] = color;
+            return color;
+        }
+
+        function createNetwork() {
+            const container = document.getElementById('network');
+            const data = {
+                nodes: nodesDataset,
+                edges: edgesDataset
+            };
+            network = new vis.Network(container, data, getNetworkOptions());
+            setupNetworkEvents();
+        }
+
+        function getNetworkOptions(isHierarchical = true) {
+            return {
+                layout: {
+                    improvedLayout: false,
+                    hierarchical: isHierarchical ? {
+                        direction: 'UD',
+                        sortMethod: 'directed',
+                        levelSeparation: 100,
+                        nodeSpacing: 120,
+                        treeSpacing: 140,
+                        blockShifting: false,
+                        parentCentralization: false
+                    } : false
+                },
+                physics: {
+                    enabled: false,
+                },
+                nodes: {
+                    shape: 'box',
+                    margin: 10,
+                    widthConstraint: {
+                        minimum: 80,
+                        maximum: 120
+                    },
+                    fixed: false,
+                    font: {
+                        size: 12,
+                        face: 'Arial'
+                    }
+                },
+                edges: {
+                    smooth: false,
+                    width: 1,
+                    chosen: false
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    hover: true,
+                    navigationButtons: true,
+                    keyboard: true,
+                    tooltipDelay: 300,
+                    zoomView: true,
+                    hideEdgesOnDrag: true
+                }
+            };
+        }
+
+        function setupNetworkEvents() {
+            network.on('click', function(params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = nodesDataset.get(nodeId);
+                    if (node) {
+                        displayUrls(node.urls);
+                        document.getElementById('selectedNode').textContent = `Selected: ${node.label}`;
+                    }
+                }
+            });
+        }
+
+        function displayUrls(urls) {
+            const urlList = document.getElementById('urlList');
+            urlList.innerHTML = '';
+            urls.forEach(url => {
+                const div = document.createElement('div');
+                div.className = 'url-item';
+                div.textContent = url;
+                div.title = url;
+                urlList.appendChild(div);
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('nodeCount').textContent = `Nodes: ${nodesDataset.length}`;
+            document.getElementById('edgeCount').textContent = `Edges: ${edgesDataset.length}`;
+        }
+
+        function searchNodes() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            if (!searchTerm) return;
+
+            const foundNode = nodesDataset.get().find(node => 
+                node.id.toLowerCase().includes(searchTerm) || 
+                node.urls.some(url => url.toLowerCase().includes(searchTerm))
+            );
+
+            if (foundNode) {
+                network.focus(foundNode.id, {
+                    scale: 1
+                });
+                network.selectNodes([foundNode.id]);
+                displayUrls(foundNode.urls);
+            }
+        }
+
+        function toggleLayout() {
+            isHierarchicalLayout = !isHierarchicalLayout;
+            network.setOptions(getNetworkOptions(isHierarchicalLayout));
+            network.stabilize();
+        }
+
+        function fitNetwork() {
+            network.fit();
+        }
+
+        let physicsEnabled = true;
+        function togglePhysics() {
+            physicsEnabled = !physicsEnabled;
+            network.setOptions({ physics: { enabled: physicsEnabled } });
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
