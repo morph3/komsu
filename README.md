@@ -1,8 +1,8 @@
 # Komsu
 
-You are a security researcher or a bug bounty hunter and you have a bunch of URLs but you don't know where to begin ? Komsu can help you.
+You are a security researcher or a bug bounty hunter and you have a bunch of URLs but you don't know where to start ? Komsu can help you.
 
-Give your URLs to Komsu and it will generate bunch of 3-level trees based on the responses. Each level is calculated as follows,
+Give your URLs to Komsu and it will generate a bunch of 3-level trees based on the responses. Each level is calculated as follows,
 
 ```
 Levels:
@@ -11,7 +11,7 @@ Levels:
     3: body + headers + status_code + reason
 ```
 
-Komsu at the end generates bunch of trees and visualizes them in an HTML file. You can easily eliminate a family of URLs shortening the analysis process.
+Komsu at the end generates a bunch of trees and visualizes them in an HTML file. You can easily eliminate a family of URLs and shorten the analysis process.
 
 ![1.png](https://github.com/morph3/komsu/blob/main/images/1.png)
 Demo,
