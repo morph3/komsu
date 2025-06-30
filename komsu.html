@@ -4,347 +4,661 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>URL Response Hash Visualization</title>
-    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-    <link href="https://unpkg.com/vis-network/standalone/umd/vis-network.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://d3js.org/d3.v7.min.js"></script>
     <style>
+        :root {
+            --primary-color: #4CAF50;
+            --primary-hover: #45a049;
+            --secondary-color: #2196F3;
+            --background: #f8f9fa;
+            --surface: #ffffff;
+            --text: #333333;
+            --border: #e0e0e0;
+            --shadow: rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Segoe UI', Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--background);
+            color: var(--text);
+            line-height: 1.6;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
             margin: 0;
             padding: 20px;
-            background-color: #f8f9fa;
-            color: #333;
-        }
-        .container {
-            max-width: 1800px;
-            margin: 0 auto;
-            background-color: white;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        #network {
-            width: 100%;
-            height: 700px;
-            border: 1px solid #e0e0e0;
-            background-color: #ffffff;
-            border-radius: 8px;
-        }
-        #urlList {
-            margin-top: 20px;
-            max-height: 300px;
-            overflow-y: auto;
-            padding: 15px;
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            background-color: #fafafa;
-        }
-        .url-item {
-            padding: 8px 12px;
-            border-bottom: 1px solid #eee;
-        }
-        .controls {
-            margin: 20px 0;
+            background-color: var(--surface);
             display: flex;
-            gap: 15px;
+            flex-direction: column;
+        }
+
+        h1 {
+            margin: 0 0 20px 0;
+            color: var(--text);
+            font-weight: 300;
+            font-size: 2rem;
+        }
+
+        .controls-section {
+            margin-bottom: 15px;
+            flex-shrink: 0;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        .search-container input {
+            flex: 1;
+            max-width: 400px;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .search-container input:focus {
+            outline: none;
+            border-color: var(--secondary-color);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
             flex-wrap: wrap;
         }
+
         button {
-            padding: 10px 20px;
-            background-color: #4CAF50;
+            padding: 12px 20px;
+            background-color: var(--primary-color);
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
             font-weight: 500;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
         }
+
         button:hover {
-            background-color: #45a049;
+            background-color: var(--primary-hover);
+            transform: translateY(-2px);
         }
-        .stats {
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        #visualization {
+            width: 100%;
+            flex: 1;
+            min-height: 0;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 30px;
+            margin: 10px 0;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, var(--background) 0%, #e3f2fd 100%);
+            border-radius: 8px;
+            font-weight: 500;
+            flex-shrink: 0;
+        }
+
+        .stats-bar span {
+            color: var(--secondary-color);
+        }
+
+        .url-section {
             margin-top: 15px;
-            padding: 10px;
-            background-color: #f8f9fa;
-            border-radius: 6px;
-            font-size: 0.9em;
+            flex-shrink: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
         }
+
+        .url-section h2 {
+            margin: 0 0 10px 0;
+            color: var(--text);
+            font-weight: 400;
+            font-size: 1.2rem;
+        }
+
+        #urlList {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 20px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            background-color: var(--surface);
+        }
+
+        .url-item {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            word-break: break-all;
+            transition: background-color 0.2s ease;
+        }
+
+        .url-item:hover {
+            background-color: var(--background);
+        }
+
+        .url-item:last-child {
+            border-bottom: none;
+        }
+
         .loading {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background-color: rgba(0,0,0,0.7);
+            background-color: rgba(0, 0, 0, 0.8);
             color: white;
-            padding: 20px;
-            border-radius: 8px;
+            padding: 30px 40px;
+            border-radius: 12px;
+            font-size: 16px;
+            z-index: 1000;
             display: none;
         }
-        .zoom-controls {
+
+        .tooltip {
             position: absolute;
-            right: 30px;
-            top: 100px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        .search-container {
-            margin: 15px 0;
-            display: flex;
-            gap: 10px;
-        }
-        #searchInput {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            flex-grow: 1;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            font-size: 13px;
             max-width: 300px;
+            z-index: 100;
+        }
+
+        /* D3 Styles */
+        .node circle {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .node circle:hover {
+            stroke-width: 3px;
+        }
+
+        .node text {
+            font-size: 11px;
+            font-weight: 500;
+            pointer-events: none;
+            text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
+        }
+
+        .link {
+            fill: none;
+            stroke: #999;
+            stroke-opacity: 0.6;
+            stroke-width: 1.5px;
+        }
+
+        .node.selected circle {
+            stroke: #ff4500 !important;
+            stroke-width: 4px !important;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>URL Response Hash Visualization</h1>
-        <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Search by hash or URL...">
-            <button onclick="searchNodes()">Search</button>
-        </div>
-        <div class="controls">
-            <button onclick="togglePhysics()">Toggle Physics</button>
-            <button onclick="fitNetwork()">Fit View</button>
-        </div>
-        <div style="position: relative;">
-            <div id="network"></div>
-            <div class="zoom-controls">
-                <button onclick="network.zoomIn()">+</button>
-                <button onclick="network.zoomOut()">-</button>
+        
+        <div class="controls-section">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search by hash or URL...">
+                <button onclick="visualization.searchNodes()">Search</button>
+            </div>
+            
+            <div class="button-group">
+                <button onclick="visualization.resetView()">Reset View</button>
+                <button onclick="visualization.toggleLabels()">Toggle Labels</button>
+                <button onclick="visualization.toggleColorMode()">Toggle Colors</button>
+                <button onclick="visualization.organizeByLevel()">Organize</button>
+                <button onclick="visualization.expandLayout()">Expand</button>
+                <button onclick="visualization.compressLayout()">Compress</button>
             </div>
         </div>
-        <div class="stats">
-            <span id="nodeCount">Nodes: 0</span> | 
-            <span id="edgeCount">Edges: 0</span> |
-            <span id="selectedNode">Selected: None</span>
+
+        <div id="visualization"></div>
+
+        <div class="stats-bar">
+            <div>Nodes: <span id="nodeCount">0</span></div>
+            <div>Edges: <span id="edgeCount">0</span></div>
+            <div>Selected: <span id="selectedNode">None</span></div>
         </div>
-        <h2>URLs in Selected Node</h2>
-        <div id="urlList"></div>
+
+        <div class="url-section">
+            <h2>URLs in Selected Node</h2>
+            <div id="urlList">
+                <div class="url-item">Select a node to view its URLs</div>
+            </div>
+        </div>
     </div>
-    <div class="loading" id="loadingIndicator">Loading...</div>
+
+    <div class="loading" id="loadingIndicator">Loading visualization...</div>
+    <div class="tooltip" id="tooltip"></div>
 
     <script>
-        let network;
-        let treeData;
-        let nodesDataset;
-        let edgesDataset;
-        let isHierarchicalLayout = true;
-        const colorCache = {};
+        class HashVisualization {
+            constructor() {
+                this.graph = { nodes: [], links: [] };
+                this.simulation = null;
+                this.svg = null;
+                this.g = null;
+                this.zoom = null;
+                this.width = 0;
+                this.height = 0;
+                this.showLabels = true;
+                this.colorByLevel = true;
+                this.nodeById = new Map();
+                this.selectedNode = null;
+                
+                // Color schemes
+                this.levelColors = ["#3498db", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c"];
+                this.urlCountColors = d3.scaleSequential(d3.interpolateViridis).domain([1, 50]);
+            }
 
-        async function loadData() {
-            try {
-                document.getElementById('loadingIndicator').style.display = 'block';
+            async init() {
+                this.showLoading(true);
+                
+                try {
+                    await this.loadData();
+                    this.setupVisualization();
+                    this.updateStats();
+                    
+                    // Start with the compressed layout
+                    // Set the force charge to match the Compress button
+                    this.simulation.force('charge', d3.forceManyBody().strength(-100));
+                    
+                    // Initial organization
+                    setTimeout(() => {
+                        this.organizeByLevel();
+                        setTimeout(() => this.resetView(), 500);
+                    }, 100);
+                } catch (error) {
+                    console.error('Error initializing visualization:', error);
+                    this.showError('Failed to load data');
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+
+            async loadData() {
                 const response = await fetch('tree.json');
-                treeData = await response.json();
-                
-                // Pre-calculate nodes and edges
-                const { nodes, edges } = processAllNodes(treeData);
-                
-                // Create datasets only once
-                nodesDataset = new vis.DataSet(nodes);
-                edgesDataset = new vis.DataSet(edges);
-                
-                createNetwork();
-                updateStats();
-                network.stabilize(100);
-            } catch (error) {
-                console.error('Error loading data:', error);
-            } finally {
-                document.getElementById('loadingIndicator').style.display = 'none';
-            }
-        }
-
-        function processAllNodes(data) {
-            const nodes = [];
-            const edges = [];
-            Object.entries(data).forEach(([hash, nodeData]) => {
-                processNode(hash, nodeData, nodes, edges);
-            });
-            return { nodes, edges };
-        }
-
-        function processNode(hash, data, nodes, edges, parent = null, level = 0) {
-            const shortHash = hash.substring(0, 6);
-            const urlCount = data.urls.length;
-            
-            nodes.push({
-                id: hash,
-                label: `${shortHash}\n(${urlCount})`,
-                title: `Hash: ${hash}\nURLs: ${urlCount}`,
-                level: level,
-                urls: data.urls,
-                value: Math.max(10, Math.min(30, urlCount * 2)),
-                color: getColorForLevel(level),
-                font: { 
-                    color: '#000000',
-                    size: 12,
-                    face: 'Arial'
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
                 }
-            });
+                const treeData = await response.json();
+                this.processTreeData(treeData);
+            }
 
-            if (parent) {
-                edges.push({
-                    from: parent,
-                    to: hash,
-                    arrows: 'to',
-                    color: { color: '#848484', opacity: 0.5 }
+            processTreeData(treeData) {
+                // Create root node
+                const rootNode = {
+                    id: "root",
+                    label: "Root",
+                    level: -1,
+                    urls: [],
+                    size: 25
+                };
+                
+                this.graph.nodes.push(rootNode);
+                this.nodeById.set(rootNode.id, rootNode);
+                
+                // Process tree structure
+                Object.entries(treeData).forEach(([hash, nodeData]) => {
+                    this.processNode(hash, nodeData, 0, "root");
                 });
             }
 
-            if (data.children) {
-                Object.entries(data.children).forEach(([childHash, childData]) => {
-                    processNode(childHash, childData, nodes, edges, hash, level + 1);
+            processNode(hash, data, level, parentId) {
+                const shortHash = hash.substring(0, 8);
+                const urlCount = data.urls?.length || 0;
+                
+                if (!this.nodeById.has(hash)) {
+                    const node = {
+                        id: hash,
+                        label: `${shortHash} (${urlCount})`,
+                        level: level,
+                        urls: data.urls || [],
+                        size: Math.max(6, Math.min(20, 8 + urlCount / 2))
+                    };
+                    
+                    this.graph.nodes.push(node);
+                    this.nodeById.set(hash, node);
+                }
+                
+                // Create parent-child link
+                this.graph.links.push({
+                    source: parentId,
+                    target: hash,
+                    value: 1
+                });
+                
+                // Process children recursively
+                if (data.children) {
+                    Object.entries(data.children).forEach(([childHash, childData]) => {
+                        this.processNode(childHash, childData, level + 1, hash);
+                    });
+                }
+            }
+
+            setupVisualization() {
+                const container = document.getElementById('visualization');
+                this.width = container.clientWidth;
+                this.height = container.clientHeight;
+                
+                // Create SVG
+                this.svg = d3.select('#visualization')
+                    .append('svg')
+                    .attr('width', this.width)
+                    .attr('height', this.height);
+                
+                // Setup zoom
+                this.zoom = d3.zoom()
+                    .scaleExtent([0.1, 8])
+                    .on('zoom', (event) => {
+                        this.g.attr('transform', event.transform);
+                    });
+                
+                this.svg.call(this.zoom);
+                
+                // Main group
+                this.g = this.svg.append('g');
+                
+                // Create links
+                this.g.selectAll('.link')
+                    .data(this.graph.links)
+                    .enter()
+                    .append('line')
+                    .attr('class', 'link');
+                
+                // Create nodes
+                const nodes = this.g.selectAll('.node')
+                    .data(this.graph.nodes)
+                    .enter()
+                    .append('g')
+                    .attr('class', 'node')
+                    .call(this.createDragBehavior())
+                    .on('click', (event, d) => this.selectNode(d))
+                    .on('mouseover', (event, d) => this.showTooltip(event, d))
+                    .on('mouseout', () => this.hideTooltip());
+                
+                // Add circles
+                nodes.append('circle')
+                    .attr('r', d => d.size)
+                    .attr('fill', d => this.getNodeColor(d))
+                    .attr('stroke', '#fff')
+                    .attr('stroke-width', 2);
+                
+                // Add labels
+                nodes.append('text')
+                    .attr('dx', d => d.size + 8)
+                    .attr('dy', '.35em')
+                    .text(d => d.label)
+                    .style('display', this.showLabels ? 'block' : 'none');
+                
+                // Setup simulation
+                this.createSimulation();
+            }
+
+            createSimulation() {
+                // Start with the exact same parameters as the Compress button uses
+                this.simulation = d3.forceSimulation(this.graph.nodes)
+                    .force('link', d3.forceLink(this.graph.links)
+                        .id(d => d.id)
+                        .distance(d => {
+                            const sourceLevel = this.nodeById.get(d.source.id)?.level || 0;
+                            return 80 + sourceLevel * 20;
+                        }))
+                    // Use -100 strength which is what the Compress button sets
+                    .force('charge', d3.forceManyBody().strength(-100))
+                    .force('center', d3.forceCenter(this.width / 2, this.height / 2))
+                    .force('collision', d3.forceCollide().radius(d => d.size + 5))
+                    .on('tick', () => this.updatePositions())
+                    .alphaDecay(0.02);
+                
+                // Fix root node position
+                const rootNode = this.graph.nodes.find(n => n.id === "root");
+                if (rootNode) {
+                    rootNode.fx = this.width / 2;
+                    rootNode.fy = this.height / 2;
+                }
+            }
+
+            updatePositions() {
+                this.g.selectAll('.link')
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+                
+                this.g.selectAll('.node')
+                    .attr('transform', d => `translate(${d.x},${d.y})`);
+            }
+
+            createDragBehavior() {
+                return d3.drag()
+                    .on('start', (event, d) => {
+                        if (!event.active) this.simulation.alphaTarget(0.3).restart();
+                        d.fx = d.x;
+                        d.fy = d.y;
+                    })
+                    .on('drag', (event, d) => {
+                        d.fx = event.x;
+                        d.fy = event.y;
+                    })
+                    .on('end', (event, d) => {
+                        if (!event.active) this.simulation.alphaTarget(0);
+                        if (d.id !== "root") {
+                            d.fx = null;
+                            d.fy = null;
+                        }
+                    });
+            }
+
+            getNodeColor(d) {
+                if (d.id === "root") return "#ff4500";
+                
+                return this.colorByLevel 
+                    ? this.levelColors[d.level % this.levelColors.length]
+                    : this.urlCountColors(Math.min(50, d.urls.length));
+            }
+
+            selectNode(node) {
+                // Clear previous selection
+                this.g.selectAll('.node').classed('selected', false);
+                
+                // Select new node
+                this.selectedNode = node;
+                this.g.selectAll('.node')
+                    .filter(d => d === node)
+                    .classed('selected', true);
+                
+                // Update UI
+                document.getElementById('selectedNode').textContent = node.label;
+                this.displayUrls(node.urls);
+            }
+
+            displayUrls(urls) {
+                const urlList = document.getElementById('urlList');
+                urlList.innerHTML = '';
+                
+                if (!urls || urls.length === 0) {
+                    urlList.innerHTML = '<div class="url-item">No URLs available</div>';
+                    return;
+                }
+                
+                urls.forEach(url => {
+                    const div = document.createElement('div');
+                    div.className = 'url-item';
+                    div.textContent = url;
+                    div.title = url;
+                    urlList.appendChild(div);
                 });
             }
-        }
 
-        function getColorForLevel(level) {
-            if (colorCache[level]) {
-                return colorCache[level];
+            showTooltip(event, d) {
+                const tooltip = d3.select('#tooltip');
+                
+                const content = `
+                    <strong>Hash:</strong> ${d.id}<br>
+                    <strong>Level:</strong> ${d.level >= 0 ? d.level : 'Root'}<br>
+                    <strong>URLs:</strong> ${d.urls.length}
+                `;
+                
+                tooltip.html(content)
+                    .style('left', (event.pageX + 15) + 'px')
+                    .style('top', (event.pageY - 10) + 'px')
+                    .style('opacity', 1);
             }
-            
-            const colors = [
-                { background: '#E3F2FD', border: '#2B7CE9' },
-                { background: '#F3E5F5', border: '#2B7CE9' },
-                { background: '#E8F5E9', border: '#2B7CE9' },
-                { background: '#FFF3E0', border: '#2B7CE9' },
-                { background: '#FFEBEE', border: '#2B7CE9' },
-                { background: '#F5F5F5', border: '#2B7CE9' }
-            ];
-            
-            const color = colors[Math.min(level, colors.length - 1)];
-            colorCache[level] = color;
-            return color;
-        }
 
-        function createNetwork() {
-            const container = document.getElementById('network');
-            const data = {
-                nodes: nodesDataset,
-                edges: edgesDataset
-            };
-            network = new vis.Network(container, data, getNetworkOptions());
-            setupNetworkEvents();
-        }
+            hideTooltip() {
+                d3.select('#tooltip').style('opacity', 0);
+            }
 
-        function getNetworkOptions(isHierarchical = true) {
-            return {
-                layout: {
-                    improvedLayout: false,
-                    hierarchical: isHierarchical ? {
-                        direction: 'UD',
-                        sortMethod: 'directed',
-                        levelSeparation: 100,
-                        nodeSpacing: 120,
-                        treeSpacing: 140,
-                        blockShifting: false,
-                        parentCentralization: false
-                    } : false
-                },
-                physics: {
-                    enabled: false,
-                },
-                nodes: {
-                    shape: 'box',
-                    margin: 10,
-                    widthConstraint: {
-                        minimum: 80,
-                        maximum: 120
-                    },
-                    fixed: false,
-                    font: {
-                        size: 12,
-                        face: 'Arial'
+            // Public methods for UI controls
+            resetView() {
+                if (!this.svg || !this.g) return;
+                
+                const bounds = this.g.node().getBBox();
+                const scale = 0.9 / Math.max(bounds.width / this.width, bounds.height / this.height);
+                const translate = [
+                    this.width / 2 - scale * (bounds.x + bounds.width / 2),
+                    this.height / 2 - scale * (bounds.y + bounds.height / 2)
+                ];
+                
+                this.svg.transition().duration(750)
+                    .call(this.zoom.transform, d3.zoomIdentity
+                        .translate(translate[0], translate[1])
+                        .scale(scale));
+            }
+
+            toggleLabels() {
+                this.showLabels = !this.showLabels;
+                this.g.selectAll('.node text')
+                    .style('display', this.showLabels ? 'block' : 'none');
+            }
+
+            toggleColorMode() {
+                this.colorByLevel = !this.colorByLevel;
+                this.g.selectAll('.node circle')
+                    .attr('fill', d => this.getNodeColor(d));
+            }
+
+            organizeByLevel() {
+                this.graph.nodes.forEach(node => {
+                    if (node.id === "root") return;
+                    
+                    const nodesAtLevel = this.graph.nodes.filter(n => n.level === node.level);
+                    const indexAtLevel = nodesAtLevel.indexOf(node);
+                    const angleStep = 2 * Math.PI / nodesAtLevel.length;
+                    const angle = indexAtLevel * angleStep;
+                    // Increased radius values for larger layout
+                    const radius = 150 + node.level * 120;
+                    
+                    node.x = this.width / 2 + radius * Math.cos(angle);
+                    node.y = this.height / 2 + radius * Math.sin(angle);
+                    
+                    if (node.level <= 1) {
+                        node.fx = node.x;
+                        node.fy = node.y;
+                        setTimeout(() => {
+                            node.fx = null;
+                            node.fy = null;
+                        }, 2000);
                     }
-                },
-                edges: {
-                    smooth: false,
-                    width: 1,
-                    chosen: false
-                },
-                interaction: {
-                    dragNodes: true,
-                    dragView: true,
-                    hover: true,
-                    navigationButtons: true,
-                    keyboard: true,
-                    tooltipDelay: 300,
-                    zoomView: true,
-                    hideEdgesOnDrag: true
-                }
-            };
-        }
-
-        function setupNetworkEvents() {
-            network.on('click', function(params) {
-                if (params.nodes.length > 0) {
-                    const nodeId = params.nodes[0];
-                    const node = nodesDataset.get(nodeId);
-                    if (node) {
-                        displayUrls(node.urls);
-                        document.getElementById('selectedNode').textContent = `Selected: ${node.label}`;
-                    }
-                }
-            });
-        }
-
-        function displayUrls(urls) {
-            const urlList = document.getElementById('urlList');
-            urlList.innerHTML = '';
-            urls.forEach(url => {
-                const div = document.createElement('div');
-                div.className = 'url-item';
-                div.textContent = url;
-                div.title = url;
-                urlList.appendChild(div);
-            });
-        }
-
-        function updateStats() {
-            document.getElementById('nodeCount').textContent = `Nodes: ${nodesDataset.length}`;
-            document.getElementById('edgeCount').textContent = `Edges: ${edgesDataset.length}`;
-        }
-
-        function searchNodes() {
-            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
-            if (!searchTerm) return;
-
-            const foundNode = nodesDataset.get().find(node => 
-                node.id.toLowerCase().includes(searchTerm) || 
-                node.urls.some(url => url.toLowerCase().includes(searchTerm))
-            );
-
-            if (foundNode) {
-                network.focus(foundNode.id, {
-                    scale: 1
                 });
-                network.selectNodes([foundNode.id]);
-                displayUrls(foundNode.urls);
+                
+                this.simulation.alpha(1).restart();
+            }
+
+            expandLayout() {
+                this.simulation.force('charge', d3.forceManyBody().strength(-400));
+                this.simulation.alpha(0.3).restart();
+            }
+
+            compressLayout() {
+                this.simulation.force('charge', d3.forceManyBody().strength(-100));
+                this.simulation.alpha(0.3).restart();
+            }
+
+            searchNodes() {
+                const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+                if (!searchTerm) return;
+                
+                const foundNode = this.graph.nodes.find(node => 
+                    node.id.toLowerCase().includes(searchTerm) || 
+                    node.urls.some(url => url.toLowerCase().includes(searchTerm))
+                );
+                
+                if (foundNode) {
+                    this.selectNode(foundNode);
+                    
+                    // Center on found node
+                    this.svg.transition().duration(750)
+                        .call(this.zoom.transform, d3.zoomIdentity
+                            .translate(this.width / 2, this.height / 2)
+                            .scale(1.5)
+                            .translate(-foundNode.x, -foundNode.y));
+                } else {
+                    alert('No matching nodes found');
+                }
+            }
+
+            updateStats() {
+                document.getElementById('nodeCount').textContent = this.graph.nodes.length;
+                document.getElementById('edgeCount').textContent = this.graph.links.length;
+            }
+
+            showLoading(show) {
+                document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+            }
+
+            showError(message) {
+                alert(`Error: ${message}`);
             }
         }
 
-        function toggleLayout() {
-            isHierarchicalLayout = !isHierarchicalLayout;
-            network.setOptions(getNetworkOptions(isHierarchicalLayout));
-            network.stabilize();
-        }
+        // Initialize visualization
+        const visualization = new HashVisualization();
+        window.addEventListener('load', () => visualization.init());
 
-        function fitNetwork() {
-            network.fit();
-        }
-
-        let physicsEnabled = true;
-        function togglePhysics() {
-            physicsEnabled = !physicsEnabled;
-            network.setOptions({ physics: { enabled: physicsEnabled } });
-        }
-
-        loadData();
+        // Handle search on Enter key
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    visualization.searchNodes();
+                }
+            });
+        });
     </script>
 </body>
 </html>
