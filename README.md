@@ -36,6 +36,7 @@ options:
                         Output JSON file (default: tree.json)
   --workers WORKERS, -w WORKERS, --threads WORKERS, -t WORKERS
                         Number of worker threads (default: 10)
+  --timeout TIMEOUT     Request timeout in seconds (default: 4)
   --verbose, -v         Enable verbose output
   ```
 
@@ -47,6 +48,15 @@ Tree saved to tree.json
 ```
 
 Serve the HTML file with `python3 -m http.server` and visit the `komsu.html`
+
+## Development
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+python -m pytest tests/
+```
+
+The suite covers `komsu.py` unit behavior (mocked HTTP), tree grouping semantics, and CLI end-to-end runs against a live local test server.
 
 ## Files
 
